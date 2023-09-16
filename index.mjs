@@ -9,8 +9,19 @@ import commit from './commit.js';
 import rollback from './rollback.js';
 
 export const handler = async (event) => {
+	if (event.httpMethod === 'OPTIONS') {
+		// This is a preflight request, respond with CORS headers
+		const response = {
+			statusCode: 200,
+			headers: {
+				'Access-Control-Allow-Origin': '*',
+			},
+			body: JSON.stringify({ message: 'Preflight request successful' }),
+		};
+		return response;
+	}
 	console.log('==============================');
-	const body = event.body;
+	const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
 	const secret_name = "shopify_app";
 	const client = new SecretsManagerClient({
 		region: "ap-northeast-1",
