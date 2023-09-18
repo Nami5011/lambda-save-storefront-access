@@ -100,19 +100,6 @@ export const handler = async (event) => {
 		id
 	DESC LIMIT 1;
 	`;
-	const insertSql = `
-	INSERT INTO storefront_api (
-		app_name,
-		shopify_domain,
-		storefront_key_id,
-		storefront_key
-	) VALUES (
-		'${body.app_name}',
-		'${body.shopify_domain}',
-		'${body.storefront_key_id}',
-		'${body.storefront_key}'
-	);
-	`;
 
 	// Get token
 	var selectResult = [];
@@ -132,13 +119,61 @@ export const handler = async (event) => {
 	}
 
 	// End process if token exists
-	if (selectResult && selectResult.length > 0) {
+	if (selectResult && selectResult.length > 0 && selectResult[0]?.storefront_key_id == body.storefront_key_id) {
 		console.log('token exists ', selectResult);
 		response.body = selectResult;
 		return response;
 	}
 
+	// Update token
+	const storefront_api_id = selectResult[0]?.id;
+	const updateSql = `
+	UPDATE storefront_api 
+	SET
+		storefront_key_id = '${body.storefront_key_id}',
+		storefront_key = '${body.storefront_key}'
+	WHERE
+		id = ${storefront_api_id};
+	`;
+	if (selectResult && selectResult.length > 0 && selectResult[0]?.storefront_key_id != body.storefront_key_id) {
+		var updateResult = [];
+		try {
+			updateResult = await query(connection, updateSql);
+			updateResult = await query(connection, selectSql);
+			console.log('Token updated ', updateResult);
+			if (updateResult && updateResult.length > 0) {
+				response.body = updateResult;
+			}
+			await commit(connection);
+		} catch(err) {
+			await rollback(connection);
+			console.error('Failed token update ', err);
+			response.statusCode = 500;
+			response.body = {
+				errors: [{
+					code: '04',
+					message: 'Internal error.',
+				}]
+			};
+		}
+		return response;
+	}
+
+
 	// Save new token
+	const insertSql = `
+	INSERT INTO storefront_api (
+		app_name,
+		shopify_domain,
+		storefront_key_id,
+		storefront_key
+	) VALUES (
+		'${body.app_name}',
+		'${body.shopify_domain}',
+		'${body.storefront_key_id}',
+		'${body.storefront_key}'
+	);
+	`;
 	var insertResult = [];
 	try {
 		insertResult = await query(connection, insertSql);
@@ -154,7 +189,7 @@ export const handler = async (event) => {
 		response.statusCode = 500;
 		response.body = {
 			errors: [{
-				code: '04',
+				code: '05',
 				message: 'Internal error.',
 			}]
 		};
